@@ -19,3 +19,4 @@ debug.keystore
 /.build-outputs
 *.apk
 *.aab
+public/*.zip
