@@ -1,0 +1,6 @@
+{
+  "name": "Scanner Pro",
+  "description": "Professional document scanner with automatic edge detection, perspective correction, batch scanning, OCR, and encrypted local PDF export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

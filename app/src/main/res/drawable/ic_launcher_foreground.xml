@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Document Page Body -->
+    <path
+        android:fillColor="#F8FAFC"
+        android:pathData="M34,26 L62,26 L74,38 L74,80 C74,82.2 72.2,84 70,84 L34,84 C31.8,84 30,82.2 30,80 L30,30 C30,27.8 31.8,26 34,26 Z" />
+
+    <!-- Folded Corner -->
+    <path
+        android:fillColor="#CBD5E1"
+        android:pathData="M62,26 L62,38 L74,38 Z" />
+
+    <!-- Document Content Lines -->
+    <path
+        android:fillColor="#94A3B8"
+        android:pathData="M37,42 L67,42 L67,44.5 L37,44.5 Z M37,49 L67,49 L67,51.5 L37,51.5 Z M37,56 L58,56 L58,58.5 L37,58.5 Z M37,63 L67,63 L67,65.5 L37,65.5 Z M37,70 L52,70 L52,72.5 L37,72.5 Z" />
+
+    <!-- Scanner Target Crop Reticle Corners (CamScanner Style) -->
+    <!-- Top-Left Corner -->
+    <path
+        android:strokeColor="#10B981"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M23,34 L23,24 L33,24" />
+
+    <!-- Top-Right Corner -->
+    <path
+        android:strokeColor="#10B981"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M75,24 L85,24 L85,34" />
+
+    <!-- Bottom-Left Corner -->
+    <path
+        android:strokeColor="#10B981"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M23,74 L23,84 L33,84" />
+
+    <!-- Bottom-Right Corner -->
+    <path
+        android:strokeColor="#10B981"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M75,84 L85,84 L85,74" />
+
+    <!-- Radiant Cyan/Emerald Laser Scan Beam across middle -->
+    <path
+        android:pathData="M20,53 L88,53 L88,57 L20,57 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="20"
+                android:startY="55"
+                android:endX="88"
+                android:endY="55"
+                android:type="linear">
+                <item android:color="#0000DF89" android:offset="0.0" />
+                <item android:color="#FF00DF89" android:offset="0.5" />
+                <item android:color="#0000DF89" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Laser Core Line -->
+    <path
+        android:strokeColor="#E6FFFFFF"
+        android:strokeWidth="1.2"
+        android:pathData="M22,55 L86,55" />
+</vector>
