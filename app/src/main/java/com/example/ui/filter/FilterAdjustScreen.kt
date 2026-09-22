@@ -1,6 +1,7 @@
 package com.example.ui.filter
 
 import android.graphics.Bitmap
+import android.graphics.Matrix
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,6 +27,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.RotateLeft
+import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -78,12 +81,22 @@ fun FilterAdjustScreen(
     var selectedFilter by remember { mutableStateOf(FilterType.MAGIC_COLOR) }
     var isEncrypted by remember { mutableStateOf(false) }
 
-    // Live filtered preview bitmap
+    var currentBaseBitmap by remember { mutableStateOf(warpedBitmap) }
     var previewBitmap by remember { mutableStateOf(warpedBitmap) }
 
-    LaunchedEffect(selectedFilter) {
+    fun rotateBaseImage(degrees: Float) {
+        val matrix = Matrix().apply { postRotate(degrees) }
+        val rotated = Bitmap.createBitmap(
+            currentBaseBitmap, 0, 0,
+            currentBaseBitmap.width, currentBaseBitmap.height,
+            matrix, true
+        )
+        currentBaseBitmap = rotated
+    }
+
+    LaunchedEffect(selectedFilter, currentBaseBitmap) {
         withContext(Dispatchers.Default) {
-            val filtered = ImageFilterEngine.applyFilter(warpedBitmap, selectedFilter)
+            val filtered = ImageFilterEngine.applyFilter(currentBaseBitmap, selectedFilter)
             withContext(Dispatchers.Main) {
                 previewBitmap = filtered
             }
@@ -113,25 +126,47 @@ fun FilterAdjustScreen(
                 )
             }
             Text(
-                text = "CamScanner Enhancement",
+                text = "Document Enhancement",
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = TextPrimary
             )
-            IconButton(
-                onClick = {
-                    onSave(title, selectedCategory, selectedFilter, isEncrypted)
-                },
-                modifier = Modifier.testTag("save_scan_button")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = "Save",
-                    tint = ScannerEmerald
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { rotateBaseImage(-90f) },
+                    modifier = Modifier.testTag("filter_rotate_left")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.RotateLeft,
+                        contentDescription = "Rotate left",
+                        tint = TextSecondary
+                    )
+                }
+                IconButton(
+                    onClick = { rotateBaseImage(90f) },
+                    modifier = Modifier.testTag("filter_rotate_right")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.RotateRight,
+                        contentDescription = "Rotate right",
+                        tint = TextSecondary
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        onSave(title, selectedCategory, selectedFilter, isEncrypted)
+                    },
+                    modifier = Modifier.testTag("save_scan_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Save",
+                        tint = ScannerEmerald
+                    )
+                }
             }
         }
 
-        // Preview Canvas
+        // Preview Area with filtered image
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -148,153 +183,158 @@ fun FilterAdjustScreen(
             ) {
                 AsyncImage(
                     model = previewBitmap,
-                    contentDescription = "Filtered preview",
+                    contentDescription = "Enhanced document preview",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit
                 )
             }
         }
 
-        // Filter Selection Strip (CamScanner-style filter chips with live active indicator)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            FilterType.values().forEach { filter ->
-                val isSelected = selectedFilter == filter
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (isSelected) ScannerEmerald.copy(alpha = 0.2f) else DarkSurfaceElevated)
-                        .border(
-                            1.5.dp,
-                            if (isSelected) ScannerEmerald else DarkBorder,
-                            RoundedCornerShape(10.dp)
-                        )
-                        .clickable { selectedFilter = filter }
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        if (filter == FilterType.MAGIC_COLOR) {
-                            Icon(
-                                imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = null,
-                                tint = ScannerEmerald,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                        Text(
-                            text = filter.displayName,
-                            fontSize = 12.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) TextPrimary else TextSecondary
-                        )
-                    }
-                }
-            }
-        }
-
-        // Details Panel: Title, Category, and Vault Encryption Toggle
+        // Filter Mode Carousel (Original, Magic Color, B&W, Grayscale, Sharp, Warm)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                 .background(DarkSurfaceCard)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(vertical = 12.dp)
         ) {
-            // Document Title
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("document_title_input"),
-                label = { Text("Document Name", color = TextSecondary, fontSize = 12.sp) },
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = ScannerEmerald,
-                    unfocusedBorderColor = DarkBorder,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary
-                )
+            Text(
+                text = "FILTERS & ENHANCEMENT",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = TextSecondary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
 
-            // Category Chips
-            CategoryChips(
-                selectedCategory = selectedCategory,
-                onSelectCategory = { selectedCategory = it },
-                modifier = Modifier.padding(vertical = 0.dp)
-            )
-
-            // Encrypted Storage Switch
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(DarkSurfaceElevated)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                FilterType.values().forEach { filter ->
+                    val isSelected = filter == selectedFilter
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isSelected) ScannerEmerald.copy(alpha = 0.2f) else DarkSurfaceElevated)
+                            .border(
+                                width = if (isSelected) 2.dp else 1.dp,
+                                color = if (isSelected) ScannerEmerald else DarkBorder,
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            .clickable { selectedFilter = filter }
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (filter == FilterType.MAGIC_COLOR) {
+                                Icon(
+                                    Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = if (isSelected) ScannerEmerald else TextSecondary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                            }
+                            Text(
+                                text = filter.displayName,
+                                fontSize = 13.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) ScannerEmerald else TextPrimary
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Category Selection Chips
+            Text(
+                text = "TAG CATEGORY",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = TextSecondary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+
+            CategoryChips(
+                selectedCategory = selectedCategory,
+                onSelectCategory = { selectedCategory = it },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
+            )
+
+            // Document Title & Vault Encryption Toggle
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title", fontSize = 12.sp) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = ScannerEmerald,
+                        unfocusedBorderColor = DarkBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("document_title_input")
+                )
+
+                // Encrypt in Vault switch
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isEncrypted) SecureVaultGold.copy(alpha = 0.15f) else DarkSurfaceElevated)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Lock,
                         contentDescription = "Encrypted Vault",
-                        tint = if (isEncrypted) SecureVaultGold else TextSecondary,
-                        modifier = Modifier.size(20.dp)
+                        tint = if (isEncrypted) SecureVaultGold else TextMuted,
+                        modifier = Modifier.size(16.dp)
                     )
-                    Column {
-                        Text(
-                            text = "Save to Encrypted Vault",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = TextPrimary
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Vault",
+                        fontSize = 11.sp,
+                        color = if (isEncrypted) SecureVaultGold else TextMuted
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Switch(
+                        checked = isEncrypted,
+                        onCheckedChange = { isEncrypted = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = SecureVaultGold,
+                            checkedTrackColor = SecureVaultGold.copy(alpha = 0.4f)
                         )
-                        Text(
-                            text = "Protects file with local AES-256 GCM encryption",
-                            fontSize = 11.sp,
-                            color = TextMuted
-                        )
-                    }
+                    )
                 }
-
-                Switch(
-                    checked = isEncrypted,
-                    onCheckedChange = { isEncrypted = it },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = SecureVaultGold,
-                        checkedTrackColor = SecureVaultGold.copy(alpha = 0.4f)
-                    ),
-                    modifier = Modifier.testTag("vault_encryption_switch")
-                )
             }
 
             // Save Document Button
             Button(
                 onClick = { onSave(title, selectedCategory, selectedFilter, isEncrypted) },
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = ScannerEmerald),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
                     .height(48.dp)
-                    .testTag("save_and_finish_button"),
-                colors = ButtonDefaults.buttonColors(containerColor = ScannerEmerald),
-                shape = RoundedCornerShape(12.dp)
+                    .testTag("confirm_save_button")
             ) {
+                Icon(Icons.Default.Check, contentDescription = null, tint = DarkBg)
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Save Document",
                     color = DarkBg,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
+                    fontSize = 15.sp
                 )
             }
         }

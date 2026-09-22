@@ -1,6 +1,7 @@
 package com.example.ui.crop
 
 import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -14,18 +15,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CropFree
 import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.RotateLeft
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -33,10 +34,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -54,11 +54,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import androidx.compose.foundation.Image
 import com.example.engine.CornerPoints
 import com.example.engine.EdgeDetector
 import com.example.ui.theme.DarkBg
-import com.example.ui.theme.DarkBorder
 import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.DarkSurfaceElevated
 import com.example.ui.theme.LaserScanGreen
@@ -75,16 +74,32 @@ fun CropPerspectiveScreen(
     onBack: () -> Unit,
     onConfirm: (CornerPoints, Int) -> Unit
 ) {
-    var corners by remember { mutableStateOf(initialCorners) }
-    var rotation by remember { mutableStateOf(initialRotation) }
-    // Handles: "TL", "TR", "BR", "BL", or mid-edge handles "T", "R", "B", "L", or body drag "BODY"
+    // Current working bitmap (rotates directly so what user sees is exactly what gets cropped)
+    var currentBitmap by remember { mutableStateOf(bitmap) }
+    var rotationAngle by remember { mutableStateOf(initialRotation) }
+
+    // Start with auto-detected edges on the actual bitmap
+    var corners by remember {
+        mutableStateOf(
+            if (initialCorners == CornerPoints.default()) EdgeDetector.detectDocumentEdges(bitmap)
+            else initialCorners
+        )
+    }
+
     var activeDraggingTarget by remember { mutableStateOf<String?>(null) }
 
-    // Auto-detect edges immediately if corners were default
-    LaunchedEffect(bitmap) {
-        if (initialCorners == CornerPoints.default()) {
-            corners = EdgeDetector.detectDocumentEdges(bitmap)
-        }
+    // Function to rotate bitmap 90 degrees clockwise or counterclockwise
+    fun rotateImage(degrees: Float) {
+        val matrix = Matrix().apply { postRotate(degrees) }
+        val rotated = Bitmap.createBitmap(
+            currentBitmap, 0, 0,
+            currentBitmap.width, currentBitmap.height,
+            matrix, true
+        )
+        currentBitmap = rotated
+        rotationAngle = ((rotationAngle + degrees.toInt()) % 360 + 360) % 360
+        // Re-run edge detection on newly rotated image orientation
+        corners = EdgeDetector.detectDocumentEdges(rotated)
     }
 
     Column(
@@ -111,25 +126,38 @@ fun CropPerspectiveScreen(
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "Crop & Perspective",
+                    text = "Crop & Rotate",
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = TextPrimary
                 )
                 Text(
-                    text = "Drag corners, edges, or tap to adjust",
+                    text = "Drag 4 corners or edges to adjust",
                     style = MaterialTheme.typography.labelSmall,
                     color = TextSecondary
                 )
             }
-            IconButton(
-                onClick = { rotation = (rotation + 90) % 360 },
-                modifier = Modifier.testTag("rotate_button")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.RotateRight,
-                    contentDescription = "Rotate 90 degrees",
-                    tint = ScannerEmerald
-                )
+            // Rotate Controls (Left 90° & Right 90°)
+            Row {
+                IconButton(
+                    onClick = { rotateImage(-90f) },
+                    modifier = Modifier.testTag("rotate_left_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.RotateLeft,
+                        contentDescription = "Rotate 90 degrees counter-clockwise",
+                        tint = ScannerEmerald
+                    )
+                }
+                IconButton(
+                    onClick = { rotateImage(90f) },
+                    modifier = Modifier.testTag("rotate_right_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.RotateRight,
+                        contentDescription = "Rotate 90 degrees clockwise",
+                        tint = ScannerEmerald
+                    )
+                }
             }
         }
 
@@ -152,7 +180,7 @@ fun CropPerspectiveScreen(
                 val containerHeight = maxHeight.value
 
                 // Maintain image aspect ratio inside container
-                val bmpRatio = bitmap.width.toFloat() / bitmap.height.toFloat()
+                val bmpRatio = currentBitmap.width.toFloat() / currentBitmap.height.toFloat()
                 val contRatio = containerWidth / containerHeight
                 val displayW = if (bmpRatio > contRatio) containerWidth else containerHeight * bmpRatio
                 val displayH = if (bmpRatio > contRatio) containerWidth / bmpRatio else containerHeight
@@ -160,38 +188,18 @@ fun CropPerspectiveScreen(
                 Box(
                     modifier = Modifier.size(displayW.dp, displayH.dp)
                 ) {
-                    // Raw Background Image
-                    AsyncImage(
-                        model = bitmap,
+                    // Display rendered Bitmap (immediate visual update when rotated)
+                    Image(
+                        bitmap = currentBitmap.asImageBitmap(),
                         contentDescription = "Document photo",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.FillBounds
                     )
 
-                    // Interactive Drag Handles & Wireframe Polygon
+                    // Interactive Drag Handles & Wireframe Polygon Canvas
                     Canvas(
                         modifier = Modifier
                             .fillMaxSize()
-                            .pointerInput(Unit) {
-                                detectTapGestures { tapOffset ->
-                                    val normX = tapOffset.x / size.width
-                                    val normY = tapOffset.y / size.height
-                                    // Move closest corner to tapped position
-                                    val dTL = hypot(normX - corners.topLeft.x, normY - corners.topLeft.y)
-                                    val dTR = hypot(normX - corners.topRight.x, normY - corners.topRight.y)
-                                    val dBR = hypot(normX - corners.bottomRight.x, normY - corners.bottomRight.y)
-                                    val dBL = hypot(normX - corners.bottomLeft.x, normY - corners.bottomLeft.y)
-                                    val minD = minOf(dTL, dTR, dBR, dBL)
-                                    if (minD > 0.04f && minD < 0.35f) {
-                                        when (minD) {
-                                            dTL -> corners = corners.copy(topLeft = PointF(normX.coerceIn(0f, 0.8f), normY.coerceIn(0f, 0.8f)))
-                                            dTR -> corners = corners.copy(topRight = PointF(normX.coerceIn(0.2f, 1f), normY.coerceIn(0f, 0.8f)))
-                                            dBR -> corners = corners.copy(bottomRight = PointF(normX.coerceIn(0.2f, 1f), normY.coerceIn(0.2f, 1f)))
-                                            dBL -> corners = corners.copy(bottomLeft = PointF(normX.coerceIn(0f, 0.8f), normY.coerceIn(0.2f, 1f)))
-                                        }
-                                    }
-                                }
-                            }
                             .pointerInput(corners) {
                                 detectDragGestures(
                                     onDragStart = { offset ->
@@ -204,7 +212,7 @@ fun CropPerspectiveScreen(
                                         val dBR = hypot(normX - corners.bottomRight.x, normY - corners.bottomRight.y)
                                         val dBL = hypot(normX - corners.bottomLeft.x, normY - corners.bottomLeft.y)
 
-                                        // Mid-edge points
+                                        // Mid-edge distances
                                         val midTopX = (corners.topLeft.x + corners.topRight.x) / 2f
                                         val midTopY = (corners.topLeft.y + corners.topRight.y) / 2f
                                         val dMidTop = hypot(normX - midTopX, normY - midTopY)
@@ -221,9 +229,9 @@ fun CropPerspectiveScreen(
                                         val midLeftY = (corners.topLeft.y + corners.bottomLeft.y) / 2f
                                         val dMidLeft = hypot(normX - midLeftX, normY - midLeftY)
 
-                                        // Generous touch threshold (0.18 normalized space for easy thumb dragging)
-                                        val cornerThreshold = 0.18f
-                                        val edgeThreshold = 0.14f
+                                        // Generous touch thresholds (easy finger/thumb grab on mobile)
+                                        val cornerThreshold = 0.22f
+                                        val edgeThreshold = 0.16f
 
                                         val minCorner = minOf(dTL, dTR, dBR, dBL)
                                         val minEdge = minOf(dMidTop, dMidRight, dMidBottom, dMidLeft)
@@ -246,7 +254,7 @@ fun CropPerspectiveScreen(
                                                 }
                                             }
                                             else -> {
-                                                // If touch inside the document quad, drag entire selection box
+                                                // Drag entire selection box if tapped inside
                                                 val centerX = (corners.topLeft.x + corners.topRight.x + corners.bottomRight.x + corners.bottomLeft.x) / 4f
                                                 val centerY = (corners.topLeft.y + corners.topRight.y + corners.bottomRight.y + corners.bottomLeft.y) / 4f
                                                 if (hypot(normX - centerX, normY - centerY) < 0.35f) "BODY" else null
@@ -294,7 +302,6 @@ fun CropPerspectiveScreen(
                                                 )
                                             }
                                             "T" -> {
-                                                // Adjust top edge Y
                                                 val newTlY = (corners.topLeft.y + deltaNormY).coerceIn(0f, corners.bottomLeft.y - 0.05f)
                                                 val newTrY = (corners.topRight.y + deltaNormY).coerceIn(0f, corners.bottomRight.y - 0.05f)
                                                 corners = corners.copy(
@@ -303,7 +310,6 @@ fun CropPerspectiveScreen(
                                                 )
                                             }
                                             "B" -> {
-                                                // Adjust bottom edge Y
                                                 val newBlY = (corners.bottomLeft.y + deltaNormY).coerceIn(corners.topLeft.y + 0.05f, 1f)
                                                 val newBrY = (corners.bottomRight.y + deltaNormY).coerceIn(corners.topRight.y + 0.05f, 1f)
                                                 corners = corners.copy(
@@ -312,7 +318,6 @@ fun CropPerspectiveScreen(
                                                 )
                                             }
                                             "L" -> {
-                                                // Adjust left edge X
                                                 val newTlX = (corners.topLeft.x + deltaNormX).coerceIn(0f, corners.topRight.x - 0.05f)
                                                 val newBlX = (corners.bottomLeft.x + deltaNormX).coerceIn(0f, corners.bottomRight.x - 0.05f)
                                                 corners = corners.copy(
@@ -321,7 +326,6 @@ fun CropPerspectiveScreen(
                                                 )
                                             }
                                             "R" -> {
-                                                // Adjust right edge X
                                                 val newTrX = (corners.topRight.x + deltaNormX).coerceIn(corners.topLeft.x + 0.05f, 1f)
                                                 val newBrX = (corners.bottomRight.x + deltaNormX).coerceIn(corners.bottomLeft.x + 0.05f, 1f)
                                                 corners = corners.copy(
@@ -330,7 +334,6 @@ fun CropPerspectiveScreen(
                                                 )
                                             }
                                             "BODY" -> {
-                                                // Translate entire polygon
                                                 val shiftX = deltaNormX
                                                 val shiftY = deltaNormY
                                                 val minX = minOf(corners.topLeft.x, corners.bottomLeft.x)
@@ -395,8 +398,8 @@ fun CropPerspectiveScreen(
                             Triple(pBR, "BR", activeDraggingTarget == "BR"),
                             Triple(pBL, "BL", activeDraggingTarget == "BL")
                         ).forEach { (point, _, isActive) ->
-                            val outerRadius = if (isActive) 26.dp.toPx() else 20.dp.toPx()
-                            val innerRadius = if (isActive) 12.dp.toPx() else 9.dp.toPx()
+                            val outerRadius = if (isActive) 28.dp.toPx() else 22.dp.toPx()
+                            val innerRadius = if (isActive) 14.dp.toPx() else 10.dp.toPx()
                             drawCircle(
                                 color = if (isActive) LaserScanGreen else Color.White,
                                 radius = outerRadius,
@@ -423,12 +426,12 @@ fun CropPerspectiveScreen(
                         ).forEach { (mid, isActive) ->
                             drawCircle(
                                 color = if (isActive) LaserScanGreen else Color.White,
-                                radius = if (isActive) 14.dp.toPx() else 10.dp.toPx(),
+                                radius = if (isActive) 16.dp.toPx() else 12.dp.toPx(),
                                 center = mid
                             )
                             drawCircle(
                                 color = ScannerEmerald,
-                                radius = if (isActive) 7.dp.toPx() else 5.dp.toPx(),
+                                radius = if (isActive) 8.dp.toPx() else 6.dp.toPx(),
                                 center = mid
                             )
                         }
@@ -448,7 +451,7 @@ fun CropPerspectiveScreen(
             // Auto Detect Button
             OutlinedButton(
                 onClick = {
-                    corners = EdgeDetector.detectDocumentEdges(bitmap)
+                    corners = EdgeDetector.detectDocumentEdges(currentBitmap)
                 },
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = ScannerEmerald),
@@ -473,9 +476,9 @@ fun CropPerspectiveScreen(
                 Text("Full Page", fontSize = 13.sp)
             }
 
-            // Next / Confirm Button
+            // Next / Confirm Button (passes updated cropped points and applied rotation)
             Button(
-                onClick = { onConfirm(corners, rotation) },
+                onClick = { onConfirm(corners, rotationAngle) },
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = ScannerEmerald),
                 modifier = Modifier.testTag("confirm_crop_button")

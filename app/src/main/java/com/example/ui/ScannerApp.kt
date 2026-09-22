@@ -63,7 +63,6 @@ fun ScannerApp(
                     }
                 )
             }
-
             is Screen.Camera -> {
                 BackHandler { currentScreen = Screen.Home }
                 CameraScanScreen(
@@ -87,7 +86,6 @@ fun ScannerApp(
                     onBack = { currentScreen = Screen.Home }
                 )
             }
-
             is Screen.Crop -> {
                 BackHandler { currentScreen = Screen.Camera }
                 activeCropBitmap?.let { bmp ->
@@ -107,7 +105,6 @@ fun ScannerApp(
                     currentScreen = Screen.Home
                 }
             }
-
             is Screen.Filter -> {
                 BackHandler { currentScreen = Screen.Crop }
                 activeWarpedBitmap?.let { warped ->
@@ -115,25 +112,13 @@ fun ScannerApp(
                         warpedBitmap = warped,
                         onBack = { currentScreen = Screen.Crop },
                         onSave = { title, category, filter, isEncrypted ->
-                            // If multiple items staged in batch, use batch save
                             val batch = viewModel.stagedBatch.value
-                            if (batch.size > 1) {
-                                viewModel.saveBatchAsDocument(
-                                    title = title,
-                                    category = category,
-                                    isEncrypted = isEncrypted
-                                ) { docId ->
-                                    currentScreen = Screen.Detail(docId)
-                                }
-                            } else {
-                                // Single item with specific crop/filter applied
-                                viewModel.saveBatchAsDocument(
-                                    title = title,
-                                    category = category,
-                                    isEncrypted = isEncrypted
-                                ) { docId ->
-                                    currentScreen = Screen.Detail(docId)
-                                }
+                            viewModel.saveBatchAsDocument(
+                                title = title,
+                                category = category,
+                                isEncrypted = isEncrypted
+                            ) { docId ->
+                                currentScreen = Screen.Detail(docId)
                             }
                         }
                     )
@@ -141,7 +126,6 @@ fun ScannerApp(
                     currentScreen = Screen.Home
                 }
             }
-
             is Screen.Detail -> {
                 BackHandler { currentScreen = Screen.Home }
                 DocumentDetailScreen(
@@ -149,7 +133,6 @@ fun ScannerApp(
                     viewModel = viewModel,
                     onBack = { currentScreen = Screen.Home },
                     onEditPage = {
-                        // Return to home or edit page
                         currentScreen = Screen.Home
                     }
                 )
